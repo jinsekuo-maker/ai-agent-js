@@ -1,5 +1,5 @@
 import { input } from "@inquirer/prompts";
-import { Agent, run } from "@openai/agents";
+import { Agent, run, MCPServerStdio } from "@openai/agents";
 import { spinner } from "./utils/spinner.js";
 import { toAgentTool } from "./utils/agent-tool.js";
 import {
@@ -11,6 +11,14 @@ import {
 } from "./tools/index.js";
 
 const MODEL = "gpt-5-mini";
+
+const tenlongMcp = new MCPServerStdio({
+  fullCommand: "node mcp-server.js",
+  name: "tenlong",
+  cacheToolsList: true,
+});
+
+await tenlongMcp.connect();
 
 const phpTeacher = new Agent({
   name: "PHP 老師",
@@ -45,6 +53,7 @@ const homeroom = Agent.create({
 - Vue.js / Nuxt 問題請 handoff 給 Vue 老師
 - Python 問題請 handoff 給 Python 老師
 - 一般生活問題（天氣、時間、YouBike、Netflix 影片）可以直接用 tools 回答
+- 想找書、查天瓏書店資料，請使用 tenlong MCP server 提供的工具
 請用繁體中文回答。`,
   tools: [
     toAgentTool(currentTimeTool),
@@ -53,6 +62,7 @@ const homeroom = Agent.create({
     toAgentTool(netflixTool),
   ],
   handoffs: [phpTeacher, vueTeacher, pythonTeacher],
+  mcpServers: [tenlongMcp],
 });
 
 try {
@@ -81,4 +91,6 @@ try {
   } else {
     throw err;
   }
+} finally {
+  await tenlongMcp.close();
 }
