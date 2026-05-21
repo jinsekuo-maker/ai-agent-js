@@ -1,20 +1,55 @@
 import { client, DEFAULT_MODEL } from "./lib/openai.js";
+import { getWeatherTool, getWeather } from "./tools/weather.js";
+import { spinner } from "./utils/spinner.js";
 
-const tools = [
-  {
-    type: "function",
-    function: {
-      name: "get_weather",
-      description: "查詢即時天氣資訊",
-    },
-  },
-];
+const AVAILABLE_TOOLS = {
+  get_weather: getWeather,
+};
 
-const response = await client.chat.completions.create({
+const tools = [getWeatherTool];
+
+const messages = [{ role: "user", content: "請問台北現在天氣如何？" }];
+
+const askingSpinner = spinner("思考中...").start();
+
+let response = await client.chat.completions.create({
   model: DEFAULT_MODEL,
-  messages: [{ role: "user", content: "請問台北現在天氣如何？" }],
+  messages,
   tools,
   tool_choice: "auto",
 });
 
-console.log(JSON.stringify(response.choices[0].message, null, 2));
+askingSpinner.stop();
+
+const message = response.choices[0].message;
+messages.push(message);
+
+if (message.tool_calls && message.tool_calls.length > 0) {
+  for (const toolCall of message.tool_calls) {
+    const fnName = toolCall.function.name;
+    const args = JSON.parse(toolCall.function.arguments);
+    console.log(`\n[呼叫 tool] ${fnName}(${JSON.stringify(args)})`);
+
+    const fn = AVAILABLE_TOOLS[fnName];
+    const result = await fn(args);
+
+    messages.push({
+      role: "tool",
+      tool_call_id: toolCall.id,
+      content: JSON.stringify(result),
+    });
+  }
+
+  const replySpinner = spinner("思考中...").start();
+
+  response = await client.chat.completions.create({
+    model: DEFAULT_MODEL,
+    messages,
+  });
+
+  replySpinner.stop();
+
+  console.log(response.choices[0].message.content);
+} else {
+  console.log(message.content);
+}
