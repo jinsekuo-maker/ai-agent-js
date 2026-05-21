@@ -1,8 +1,13 @@
 import { input } from "@inquirer/prompts";
 import OpenAI from "openai";
 import { OPENAI_API_KEY } from "./config.js";
+import { initMessage, addMessage, getMessages } from "./db/messages.js";
 
 const client = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+await initMessage(
+  "你是一位專門講關於貓的笑話大師，請用繁體中文回答。請用幽默有趣的方式回應。"
+);
 
 try {
   while (true) {
@@ -16,19 +21,17 @@ try {
       break;
     }
 
+    await addMessage(userQuestion);
+
     const response = await client.chat.completions.create({
       model: "gpt-5-mini",
-      messages: [
-        {
-          role: "developer",
-          content:
-            "你是一位專門講關於貓的笑話大師，請用繁體中文回答。請用幽默有趣的方式回應。",
-        },
-        { role: "user", content: userQuestion },
-      ],
+      messages: getMessages(),
     });
 
-    console.log(response.choices[0].message.content);
+    const content = response.choices[0].message.content;
+    console.log(content);
+
+    await addMessage(content, "assistant");
   }
 } catch (err) {
   if (err.name === "ExitPromptError") {
