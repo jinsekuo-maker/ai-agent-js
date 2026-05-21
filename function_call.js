@@ -1,30 +1,46 @@
 import { client, DEFAULT_MODEL } from "./lib/openai.js";
 import { getWeatherTool, getWeather } from "./tools/weather.js";
+import {
+  getNearbyYoubikeTool,
+  getNearbyYoubike,
+} from "./tools/youbike.js";
 import { spinner } from "./utils/spinner.js";
 
 const AVAILABLE_TOOLS = {
   get_weather: getWeather,
+  get_nearby_youbike: getNearbyYoubike,
 };
 
-const tools = [getWeatherTool];
+const tools = [getWeatherTool, getNearbyYoubikeTool];
 
-const messages = [{ role: "user", content: "請問台北現在天氣如何？" }];
+const messages = [
+  {
+    role: "user",
+    content:
+      "我在台北車站附近，請問現在天氣如何？順便告訴我附近還有沒有 YouBike 可以租？",
+  },
+];
 
-const askingSpinner = spinner("思考中...").start();
+while (true) {
+  const spin = spinner("思考中...").start();
 
-let response = await client.chat.completions.create({
-  model: DEFAULT_MODEL,
-  messages,
-  tools,
-  tool_choice: "auto",
-});
+  const response = await client.chat.completions.create({
+    model: DEFAULT_MODEL,
+    messages,
+    tools,
+    tool_choice: "auto",
+  });
 
-askingSpinner.stop();
+  spin.stop();
 
-const message = response.choices[0].message;
-messages.push(message);
+  const message = response.choices[0].message;
+  messages.push(message);
 
-if (message.tool_calls && message.tool_calls.length > 0) {
+  if (!message.tool_calls || message.tool_calls.length === 0) {
+    console.log(message.content);
+    break;
+  }
+
   for (const toolCall of message.tool_calls) {
     const fnName = toolCall.function.name;
     const args = JSON.parse(toolCall.function.arguments);
@@ -39,17 +55,4 @@ if (message.tool_calls && message.tool_calls.length > 0) {
       content: JSON.stringify(result),
     });
   }
-
-  const replySpinner = spinner("思考中...").start();
-
-  response = await client.chat.completions.create({
-    model: DEFAULT_MODEL,
-    messages,
-  });
-
-  replySpinner.stop();
-
-  console.log(response.choices[0].message.content);
-} else {
-  console.log(message.content);
 }
