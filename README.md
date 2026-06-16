@@ -56,3 +56,4 @@ node main.js          # 或 node function_call.js / node scripts/embed-*.js
 ```bash
 docker compose up -d
 ```
+# auo_0611_hw
